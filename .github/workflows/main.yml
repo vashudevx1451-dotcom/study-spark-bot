@@ -13,11 +13,33 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install FFmpeg, Aria2 & Python Packages
+      - name: Set up Python 3.11 (Fast TgCrypto Engine)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Fast Download & Upload Engines
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg aria2
+          sudo apt-get install -y ffmpeg aria2 gcc python3-dev
+          pip install -U pip wheel setuptools
           pip install -r requirements.txt
+          mkdir -p ~/.aria2
+          printf "file-allocation=none\ndisk-cache=64M\nmax-connection-per-server=16\nsplit=16\nmin-split-size=1M\n" > ~/.aria2/aria2.conf
+
+      - name: Boost Upload Speed (8x Parallel MTProto)
+        run: |
+          python3 -c '
+          p = open("bot.py").read()
+          p = p.replace("no_updates=True", "no_updates=True, workers=16, max_concurrent_transmissions=4, sleep_threshold=60")
+          p = p.replace("file_size <= 48 * 1024 * 1024", "file_size <= 5 * 1024 * 1024")
+          open("bot.py", "w").write(p)
+          '
 
       - name: Run Bot
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
         run: python3 bot.py
