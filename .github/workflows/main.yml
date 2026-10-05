@@ -31,22 +31,39 @@ jobs:
           pip install --no-binary :all: tgcrypto || pip install tgcrypto
           pip install -r requirements.txt
 
-      - name: Unlock 32x Workers & Queue(128) Turbo Patch
+      - name: Patch Pyrogram for 8 Independent Upload Sockets (Zero FloodWait)
         run: |
           python3 -c '
           import pyrogram.methods.advanced.save_file as sf, inspect
           p_sf = inspect.getfile(sf)
           c = open(p_sf).read()
-          c = c.replace("workers_count = 4 if is_big else 1", "workers_count = 32 if is_big else 8")
-          c = c.replace("queue = asyncio.Queue(1)", "queue = asyncio.Queue(128)")
-          open(p_sf, "w").write(c)
-          print("Pyrogram 32-Worker Queue(128) Turbo Patch Applied!")
+          old_b = """            session = Session(
+                self, await self.storage.dc_id(), await self.storage.auth_key(),
+                await self.storage.test_mode(), is_media=True
+            )
+            workers = [self.loop.create_task(worker(session)) for _ in range(workers_count)]
+            queue = asyncio.Queue(1)
 
-          p = open("bot.py").read()
-          p = p.replace("\"-s\", \"16\",", "\"-s\", \"64\", \"--file-allocation=none\", \"--disk-cache=128M\",")
-          p = p.replace("\"--hls-prefer-native\",", "\"--external-downloader\", \"aria2c\", \"--external-downloader-args\", \"aria2c:-x 16 -s 64 -j 32 -k 1M --file-allocation=none --disk-cache=128M\",")
-          p = p.replace("no_updates=True", "no_updates=True, workers=32, max_concurrent_transmissions=8, sleep_threshold=180")
-          open("bot.py", "w").write(p)
+            try:
+                await session.start()"""
+          new_b = """            num_s = 8 if is_big else 1
+            sessions = [
+                Session(
+                    self, await self.storage.dc_id(), await self.storage.auth_key(),
+                    await self.storage.test_mode(), is_media=True
+                ) for _ in range(num_s)
+            ]
+            workers = []
+            queue = asyncio.Queue(64)
+
+            try:
+                await asyncio.gather(*(s.start() for s in sessions))
+                workers = [self.loop.create_task(worker(sessions[i % num_s])) for i in range(workers_count)]"""
+          c = c.replace("workers_count = 4 if is_big else 1", "workers_count = 16 if is_big else 2")
+          c = c.replace(old_b, new_b)
+          c = c.replace("await session.stop()", "await asyncio.gather(*(s.stop() for s in sessions), return_exceptions=True)")
+          open(p_sf, "w").write(c)
+          print("8-Socket Parallel Upload Patch Applied Successfully!")
           '
 
       - name: Run Bot
