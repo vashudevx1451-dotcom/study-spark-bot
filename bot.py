@@ -31,10 +31,9 @@ join_verify_attempts: dict[int, int] = {}
 admin_pending_input: dict[int, dict] = {}
 
 # Bot Configuration & Credentials
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8556372017:AAEZkll20Z4WEWYJPG1iS0pvX-YVymH_J20")
-API_ID = int(os.getenv("API_ID", "39902940"))
-API_HASH = os.getenv("API_HASH", "9f37fc6282079681fd4c1bb55916a758")
-
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+API_ID = int(os.getenv("API_ID", "0"))
+API_HASH = os.getenv("API_HASH", "")
 DOWNLOAD_DIR = "/tmp/tg_bot_downloads"
 STATUS_FILE = "/tmp/tg_bot_status.json"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
