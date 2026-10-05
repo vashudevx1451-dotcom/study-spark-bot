@@ -1,0 +1,23 @@
+name: Study Spark Bot 24x7
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */5 * * *'
+
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg, Aria2 & Python Packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg aria2
+          pip install -r requirements.txt
+
+      - name: Run Bot
+        run: python3 bot.py
