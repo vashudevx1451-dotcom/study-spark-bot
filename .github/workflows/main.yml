@@ -13,27 +13,27 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11 (Fast TgCrypto Engine)
+      - name: Set up Python 3.10 (100% TgCrypto C-Speed Compatible)
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
           cache: 'pip'
 
-      - name: Install Fast Download & Upload Engines
+      - name: Install C-Speed Engines (Aria2 64x + FFmpeg + TgCrypto)
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg aria2 gcc python3-dev
+          sudo apt-get install -y ffmpeg aria2 build-essential python3-dev
           pip install -U pip wheel setuptools
+          pip install --no-binary :all: tgcrypto || pip install tgcrypto
           pip install -r requirements.txt
-          mkdir -p ~/.aria2
-          printf "file-allocation=none\ndisk-cache=64M\nmax-connection-per-server=16\nsplit=16\nmin-split-size=1M\n" > ~/.aria2/aria2.conf
+          python3 -c "import tgcrypto; print('TgCrypto C-Engine Active!')"
 
-      - name: Boost Upload Speed (8x Parallel MTProto)
+      - name: Boost 700MB MP4 Download & Upload Speed
         run: |
           python3 -c '
           p = open("bot.py").read()
-          p = p.replace("no_updates=True", "no_updates=True, workers=16, max_concurrent_transmissions=4, sleep_threshold=60")
-          p = p.replace("file_size <= 48 * 1024 * 1024", "file_size <= 5 * 1024 * 1024")
+          p = p.replace("\"-s\", \"16\",", "\"-s\", \"64\", \"--file-allocation=none\", \"--disk-cache=128M\",")
+          p = p.replace("\"--hls-prefer-native\",", "\"--external-downloader\", \"aria2c\", \"--external-downloader-args\", \"aria2c:-x 16 -s 64 -j 32 -k 1M --file-allocation=none --disk-cache=128M\",")
           open("bot.py", "w").write(p)
           '
 
