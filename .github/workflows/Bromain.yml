@@ -1,0 +1,56 @@
+name: Study Spark Bot 24x7
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */5 * * *'
+
+concurrency:
+  group: study-spark-bot-single
+  cancel-in-progress: true
+
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Fast Engines
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg aria2 build-essential python3-dev
+          pip install -U pip wheel setuptools
+          pip install --no-binary :all: tgcrypto || pip install tgcrypto
+          pip install -r requirements.txt
+
+      - name: Apply 4-Socket (16 Workers) Turbo Upload Patch
+        run: |
+          python3 -c '
+          import pyrogram.methods.advanced.save_file as sf, inspect, py_compile
+          p_sf = inspect.getfile(sf)
+          c = open(p_sf).read()
+          c = c.replace("workers_count = 4 if is_big else 1", "workers_count = 16 if is_big else 4")
+          c = c.replace("workers = [self.loop.create_task(worker(session)) for _ in range(workers_count)]", "sessions = [session] + [Session(self, await self.storage.dc_id(), await self.storage.auth_key(), await self.storage.test_mode(), is_media=True) for _ in range(3 if is_big else 0)]; workers = [self.loop.create_task(worker(sessions[i % len(sessions)])) for i in range(workers_count)]")
+          c = c.replace("queue = asyncio.Queue(1)", "queue = asyncio.Queue(64)")
+          c = c.replace("await session.start()", "for _s in sessions: await _s.start()")
+          c = c.replace("await session.stop()", "for _s in sessions: await _s.stop()")
+          assert "sessions = [session]" in c, "Patch failed"
+          open(p_sf, "w").write(c)
+          py_compile.compile(p_sf, doraise=True)
+          print("4-Socket 16-Worker Turbo Upload Verified OK!")
+          '
+
+      - name: Run Bot
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+        run: python3 bot.py
