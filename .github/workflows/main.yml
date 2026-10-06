@@ -31,7 +31,7 @@ jobs:
           pip install --no-binary :all: tgcrypto || pip install tgcrypto
           pip install -r requirements.txt
 
-      - name: Patch Pyrogram for 8 Independent Upload Sockets (Zero FloodWait)
+      - name: Safe 3-Session (12 Workers) Upload Boost
         run: |
           python3 -c '
           import pyrogram.methods.advanced.save_file as sf, inspect
@@ -46,7 +46,7 @@ jobs:
 
             try:
                 await session.start()"""
-          new_b = """            num_s = 8 if is_big else 1
+          new_b = """            num_s = 3 if is_big else 1
             sessions = [
                 Session(
                     self, await self.storage.dc_id(), await self.storage.auth_key(),
@@ -54,16 +54,18 @@ jobs:
                 ) for _ in range(num_s)
             ]
             workers = []
-            queue = asyncio.Queue(64)
+            queue = asyncio.Queue(32)
 
             try:
-                await asyncio.gather(*(s.start() for s in sessions))
+                for s in sessions:
+                    await s.start()
+                    await asyncio.sleep(0.05)
                 workers = [self.loop.create_task(worker(sessions[i % num_s])) for i in range(workers_count)]"""
-          c = c.replace("workers_count = 4 if is_big else 1", "workers_count = 16 if is_big else 2")
+          c = c.replace("workers_count = 4 if is_big else 1", "workers_count = 12 if is_big else 2")
           c = c.replace(old_b, new_b)
           c = c.replace("await session.stop()", "await asyncio.gather(*(s.stop() for s in sessions), return_exceptions=True)")
           open(p_sf, "w").write(c)
-          print("8-Socket Parallel Upload Patch Applied Successfully!")
+          print("Safe 3-Session (12 Workers) Patch Applied!")
           '
 
       - name: Run Bot
